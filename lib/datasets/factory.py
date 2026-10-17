@@ -12,7 +12,10 @@ from __future__ import print_function
 
 __sets = {}
 from datasets.pascal_voc import pascal_voc
-from datasets.coco import coco
+try:
+  from datasets.coco import coco
+except ImportError:  # pycocotools extension not built; only needed for COCO
+  coco = None
 from datasets.imagenet import imagenet
 from datasets.vg import vg
 

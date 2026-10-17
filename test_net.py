@@ -26,6 +26,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
 import pickle
+import xml.etree.ElementTree as ET
 from roi_data_layer.roidb import combined_roidb
 from roi_data_layer.roibatchLoader import roibatchLoader
 from model.utils.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
@@ -266,11 +267,9 @@ if __name__ == '__main__':
         Pminus[i + 1] = np.matmul(np.matmul(Transition_Matrix, P[i]), Transition_Matrix) + Q
         if i == 0:
 
-            # Put_1
-            xmin = 1380
-            ymin = 803
-            xmax = 1395
-            ymax = 817
+            # first-frame ball box comes from its annotation (was hardcoded for Put_1)
+            bb = ET.parse('./data/VOCdevkit2007/VOC2007/Annotations/' + image_index[0] + '.xml').find('object/bndbox')
+            xmin, ymin, xmax, ymax = [int(float(bb.find(t).text)) for t in ('xmin', 'ymin', 'xmax', 'ymax')]
 
             x_center = int((xmin + xmax) / 2)
             y_center = int((ymin + ymax) / 2)
@@ -287,7 +286,7 @@ if __name__ == '__main__':
         detect_time = time.time() - det_tic
 
         image_crop = Image.fromarray(image_crop)
-        image_crop.save(directory)
+        image_crop.save(directory)  # NOTE: overwrites the frame with its crop; run on a copy of the data
 
         data = next(data_iter)
         with torch.no_grad():
@@ -311,12 +310,12 @@ if __name__ == '__main__':
             if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
                 # Optionally normalize targets by a precomputed mean and stdev
                 if args.class_agnostic:
-                    box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                        + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                    box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).to(box_deltas.device) \
+                        + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).to(box_deltas.device)
                     box_deltas = box_deltas.view(1, -1, 4)
                 else:
-                    box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                        + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                    box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).to(box_deltas.device) \
+                        + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).to(box_deltas.device)
                     box_deltas = box_deltas.view(1, -1, 4 * len(imdb.classes))
 
             pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
